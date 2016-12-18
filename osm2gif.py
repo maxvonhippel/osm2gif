@@ -131,7 +131,7 @@ def read_csv(file, width, height, zoom, video_name):
 				# render
 				_img = _map.render(zoom=zoom)
 				# save
-				_name = stamp + ".png"
+				_name = video_name + "/" + stamp + ".png"
 				_img.save(_name)
 				# now add to frames list for video
 				frame = imageio.imread(_name)
