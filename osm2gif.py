@@ -17,19 +17,6 @@ def PrintException():
     line = linecache.getline(filename, lineno, f.f_globals)
     print 'EXCEPTION IN ({}, LINE {} "{}"): {}'.format(filename, lineno, line.strip(), exc_obj)
 
-class Day():
-	# init a day
-	def __init__(self):
-		# dateutil.parser.parse(day).timestamp()
-		self.nodes = []
-		self.ways = []
-	# add a node
-	def add_node_to_day(self, node):
-		self.nodes.append(node)
-	# add a way
-	def add_way_to_day(self, way):
-		self.ways.append(way)
-
 # to hold all our days
 days = {}
 
@@ -37,16 +24,8 @@ def add_node(x, y, timestamp):
 	# add the node
 	marker = CircleMarker((x, y), 'white', 8)
 	if not timestamp in days:
-		days[timestamp] = Day()
-	days[timestamp].add_node_to_day(marker)
-
-def add_way(items, timestamp):
-	# add the way
-	polygon = Polygon([[i.lon, i.lat] for i in items], 'white', 'white', simplify)
-	if not timestamp in days:
-		days[timestamp] = Day()
-	days[timestamp].add_way_to_day(polygon)
-
+		days[timestamp] = []
+	days[timestamp].append([x, y])
 
 # for OSM (.osm, .osh, .pbf) files
 def read_osm(file, width, height, zoom, video_name):
@@ -78,8 +57,9 @@ def read_osm(file, width, height, zoom, video_name):
 				# make the map
 				_map = StaticMap(width, height, url_template='http://a.tile.osm.org/{z}/{x}/{y}.png')
 				# add the nodes
-				for node in days[stamp].nodes:
-					_map.add_marker(node)
+				for node in days[stamp]:
+					marker = CircleMarker((int(float(node[0])), int(float(node[1]))), '#ff0000', 8)
+					_map.add_marker(marker)
 				# add the ways
 				for way in days[stamp].ways:
 					_map.add_polygon(way)
@@ -109,10 +89,11 @@ def read_csv(file, width, height, zoom, video_name):
 			for row in reader:
 				lon = row[1]
 				lat = row[2]
-				versions = csv.reader(StringIO(row[3][1:-1]))
+				versions = csv.reader(str(row[3][1:-1]))
 				for row in versions:
-					if len(row) == 2:
-						stamp = row[1]
+					subrow = str(row)[3:-3].split(",")
+					if len(subrow) == 2:
+						stamp = subrow[1]
 						parsd += 1
 						if parsd % 10000 == 0:
 							print("num nodes parsed: ", parsd)
@@ -121,17 +102,16 @@ def read_csv(file, width, height, zoom, video_name):
 		with imageio.get_writer(video_name, mode='I') as writer:
 			for stamp in days:
 				# make the map
-				_map = StaticMap(width, height, url_template='http://a.tile.osm.org/{z}/{x}/{y}.png')
+				_map = StaticMap(int(float(width)), int(float(height)), url_template='http://a.tile.osm.org/{z}/{x}/{y}.png')
 				# add the nodes
-				for node in days[stamp].nodes:
-					_map.add_marker(node)
-				# add the ways
-				for way in days[stamp].ways:
-					_map.add_polygon(way)
+				for node in days[stamp]:
+					marker = CircleMarker((int(float(node[0])), int(float(node[1]))), '#ff0000', 8)
+					_map.add_marker(marker)
 				# render
-				_img = _map.render(zoom=zoom)
+				_img = _map.render(zoom=int(float(zoom)))
 				# save
-				_name = video_name + "/" + stamp + ".png"
+				print("stamp: ", stamp, " versions: ", days[stamp])
+				_name = "osm2gif" + stamp + ".png"
 				_img.save(_name)
 				# now add to frames list for video
 				frame = imageio.imread(_name)
