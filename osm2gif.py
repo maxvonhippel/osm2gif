@@ -127,7 +127,9 @@ def read_csv(file, width, height, zoom, video_name):
 
 			mapd += 1
 			if mapd % 100 == 0:
-				print("num nodes mapped into video: ", mapd)
+				print writeGif.__doc__
+				writeGif(str(mapd / 100) + video_name, images, duration=0.2)
+				images = []
 		# now exit gracefully
 		print writeGif.__doc__
 		writeGif(video_name, images, duration=0.2)
