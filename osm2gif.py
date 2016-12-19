@@ -6,6 +6,10 @@ from staticmap import StaticMap, CircleMarker, Polygon
 import imageio
 import csv
 from StringIO import StringIO
+__author__ = 'Robert'
+from images2gif import writeGif
+from PIL import Image
+import os
 
 # http://stackoverflow.com/a/20264059/1586231
 def PrintException():
@@ -99,28 +103,35 @@ def read_csv(file, width, height, zoom, video_name):
 							print("num nodes parsed: ", parsd)
 						add_node(lon, lat, stamp)
 		csvfile.close()
-		with imageio.get_writer(video_name, mode='I') as writer:
-			for stamp in days:
-				# make the map
-				_map = StaticMap(int(float(width)), int(float(height)), url_template='http://a.tile.osm.org/{z}/{x}/{y}.png')
-				# add the nodes
-				for node in days[stamp]:
-					marker = CircleMarker((int(float(node[0])), int(float(node[1]))), '#ff0000', 8)
-					_map.add_marker(marker)
-				# render
-				_img = _map.render(zoom=int(float(zoom)))
-				# save
-				print("stamp: ", stamp, " versions: ", days[stamp])
-				_name = "osm2gif" + stamp + ".png"
-				_img.save(_name)
-				# now add to frames list for video
-				frame = imageio.imread(_name)
-				writer.append_data(frame)
-				mapd += 1
-				if mapd % 1000 == 0:
-					print("num nodes mapped into video: ", mapd)
-			# now exit gracefully
-			print("all done.")
+		# with imageio.get_writer(video_name, mode='I') as writer:
+		images = []
+		for stamp in days:
+			# make the map
+			_map = StaticMap(int(float(width)), int(float(height)), url_template='http://a.tile.osm.org/{z}/{x}/{y}.png')
+			# add the nodes
+			for node in days[stamp]:
+				marker = CircleMarker((int(float(node[0])), int(float(node[1]))), '#ff0000', 8)
+				_map.add_marker(marker)
+			# render
+			_img = _map.render(zoom=int(float(zoom)))
+			# save
+			# print("stamp: ", stamp, " versions: ", days[stamp])
+			_name = "_osm2gif" + stamp + ".png"
+			_img.save(_name)
+			# now add to frames list for video
+			# frame = imageio.imread(_name)
+			# writer.append_data(frame)
+			open_image = Image.open(_name)
+			images.append(open_image)
+			open_image.thumbnail((width, height), Image.ANTIALIAS)
+
+			mapd += 1
+			if mapd % 100 == 0:
+				print("num nodes mapped into video: ", mapd)
+		# now exit gracefully
+		print writeGif.__doc__
+		writeGif(video_name, images, duration=0.2)
+		print("all done.")
 	except:
 		PrintException()
 
