@@ -1,4 +1,6 @@
 #!/usr/bin/python
+from __future__ import print_function
+import os
 import linecache
 import sys
 import dateutil.parser
@@ -6,10 +8,10 @@ from staticmap import StaticMap, CircleMarker, Polygon
 import imageio
 import csv
 from StringIO import StringIO
-__author__ = 'Robert'
+__author__ = 'Max von Hippel'
 from images2gif import writeGif
-from PIL import Image
-import os
+from PIL import Image, ImageSequence
+from datetime import datetime, timedelta
 
 # http://stackoverflow.com/a/20264059/1586231
 def PrintException():
@@ -19,23 +21,95 @@ def PrintException():
     filename = f.f_code.co_filename
     linecache.checkcache(filename)
     line = linecache.getline(filename, lineno, f.f_globals)
-    print 'EXCEPTION IN ({}, LINE {} "{}"): {}'.format(filename, lineno, line.strip(), exc_obj)
+    print('EXCEPTION IN ({}, LINE {} "{}"): {}'.format(filename, lineno, line.strip(), exc_obj))
 
 # to hold all our days
 days = {}
+
+def daterange(start_date, end_date):
+    for n in range(int ((end_date - start_date).days)):
+        yield start_date + timedelta(n)
 
 def add_node(x, y, timestamp):
 	# add the node
 	marker = CircleMarker((x, y), 'white', 8)
 	if not timestamp in days:
-		days[timestamp] = []
-	days[timestamp].append([x, y])
+		days[timestamp] = {}
+		days[timestamp]['nodes'] = []
+		days[timestamp]['ways'] = []
+	days[timestamp]['nodes'].append(marker)
+
+def add_way(members, timestamp):
+	coords = [[member.location.lon, member.location.lat] for member in members]
+	polygon = Polygon(coords, 'white', 'white', True)
+	if not timestamp in days:
+		days[timestamp] = {}
+		days[timestamp]['nodes'] = []
+		days[timestamp]['ways'] = []
+	days[timestamp]['ways'].append(polygon)
+
+def render_video(sigma, video_name, width, height, zoom):
+	# iff sigma == True, each frame contains all previous frames' stuff
+	# otherwise only stuff from that specific day
+	try:
+		# http://stackoverflow.com/a/35943809/1586231
+		if not video_name.endswith('.gif'):
+			video_name += '.gif'
+		sequence = []
+		# what is the earliest and last day in the list?
+		alldays = []
+		for stamp in days.keys():
+			try:
+				alldays.append(datetime.strptime(stamp, '%Y-%m-%d'))
+			except:
+				pass
+		youngest = min(alldays)
+		eldest = max(alldays)
+		# now iterate
+		for single_date in daterange(youngest, eldest):
+			# make the map
+			_map = StaticMap(int(float(width)), int(float(height)), url_template='http://a.tile.osm.org/{z}/{x}/{y}.png')
+			if stamp in days:
+				# add the nodes
+				for node in days[stamp]['nodes']:
+					_map.add_marker(node)
+				# add the ways
+				for way in days[stamp]['ways']:
+					_map.add_polygon(way)
+			else:
+				# get the empty image of average location for this list
+				# set it to be the "open_image"
+				_map.set_extent(83.676659, 28.220671, 83.804604, 28.409901)
+			# render
+			_img = _map.render(zoom=int(float(zoom)))
+			# save
+			_name = stamp + ".png"
+			_img.save(_name)
+			# now add to frames list for video
+			sequence.append(Image.open(_name))
+
+		# https://github.com/python-pillow/Pillow/blob/master/Scripts/gifmaker.py
+		frames = [frame.copy() for frame in ImageSequence.Iterator(sequence)]
+		fp = open(video_name, "wb")
+		im = Image.open(fp)
+		im.save(frames, save_all=True)
+		fp.close()
+		print("all done!")
+		clean_up_frames(sequence)
+	
+	except:
+		PrintException()
+
+def clean_up_frames(frames):
+	for frame in frames:
+		os.remove(frame)
 
 # for OSM (.osm, .osh, .pbf) files
-def read_osm(file, width, height, zoom, video_name):
+def read_osm(file, width, height, zoom, video_name, sigma):
 	try:
 		# imports
 		import osmium
+
 		# class to parse the nodes, relations, and ways
 		class CounterHandler(osmium.SimpleHandler):
 			# the init variables of the Counter Handler
@@ -49,45 +123,22 @@ def read_osm(file, width, height, zoom, video_name):
 		    def way(self, w):
 		    	# handle a way
 		    	add_way(w.nodes, w.timestamp)
+
 		# instantiate one    	
 		map_handler = CounterHandler()
 		map_handler.apply_file(file)
-		# on complete, render frames into a video
-		# http://stackoverflow.com/a/35943809/1586231
-		if not video_name.str.endswith('.gif'):
-			video_name += '.gif'
-		with imageio.get_writer(video_name, mode='I') as writer:
-			for stamp in days:
-				# make the map
-				_map = StaticMap(width, height, url_template='http://a.tile.osm.org/{z}/{x}/{y}.png')
-				# add the nodes
-				for node in days[stamp]:
-					marker = CircleMarker((int(float(node[0])), int(float(node[1]))), '#ff0000', 8)
-					_map.add_marker(marker)
-				# add the ways
-				for way in days[stamp].ways:
-					_map.add_polygon(way)
-				# render
-				_img = _map.render(zoom=zoom)
-				# save
-				_name = stamp + ".png"
-				_img.save(_name)
-				# now add to frames list for video
-				frame = imageio.imread(_name)
-				writer.append_data(frame)
-			# now exit gracefully
-			print("all done.")
+
+		# render video
+		render_video(sigma, video_name, width, height, zoom)
 	except:
 		PrintException()
 
 # for .csv files
 # format: id,longitude,latitude,"{[Name:timestamp], ... }"
-def read_csv(file, width, height, zoom, video_name):
+def read_csv(file, width, height, zoom, video_name, sigma):
 	parsd = 0
 	mapd = 0
 	try:
-		if not video_name.endswith('.gif'):
-			video_name += '.gif'
 		with open(file, 'rb') as csvfile:
 			reader = csv.reader(csvfile)
 			for row in reader:
@@ -103,39 +154,9 @@ def read_csv(file, width, height, zoom, video_name):
 							print("num nodes parsed: ", parsd)
 						add_node(lon, lat, stamp)
 		csvfile.close()
-		# with imageio.get_writer(video_name, mode='I') as writer:
-		images = []
-		for stamp in days:
-			# make the map
-			_map = StaticMap(int(float(width)), int(float(height)), url_template='http://a.tile.osm.org/{z}/{x}/{y}.png')
-			# add the nodes
-			for node in days[stamp]:
-				marker = CircleMarker((int(float(node[0])), int(float(node[1]))), '#ff0000', 8)
-				_map.add_marker(marker)
-			# render
-			_img = _map.render(zoom=int(float(zoom)))
-			# save
-			# print("stamp: ", stamp, " versions: ", days[stamp])
-			_name = "_osm2gif" + stamp + ".png"
-			_img.save(_name)
-			# now add to frames list for video
-			# frame = imageio.imread(_name)
-			# writer.append_data(frame)
-			open_image = Image.open(_name)
-			images.append(open_image)
-			open_image.thumbnail((width, height), Image.ANTIALIAS)
-
-			mapd += 1
-			if mapd % 100 == 0:
-				print writeGif.__doc__
-				writeGif(str(mapd / 100) + video_name, images, duration=0.2)
-				images = []
-		# now exit gracefully
-		print writeGif.__doc__
-		writeGif(video_name, images, duration=0.2)
-		print("all done.")
+		render_video(sigma, video_name, width, height, zoom)
 	except:
 		PrintException()
 
 # test
-read_csv('/Users/maxvonhippel/Documents/OSMHistoryServer/nodes.csv', 500, 500, 5, "nepal-osm-vid")
+read_csv('/Users/maxvonhippel/Documents/OSMHistoryServer/nodes.csv', 500, 500, 5, "nepal-osm-vid", False)

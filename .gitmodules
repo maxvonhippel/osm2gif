@@ -1,0 +1,3 @@
+[submodule "staticmap"]
+	path = staticmap
+	url = https://github.com/maxvonhippel/staticmap.git
