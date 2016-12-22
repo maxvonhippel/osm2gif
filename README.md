@@ -1,4 +1,4 @@
-![](osm2gif.png)
+![](docs/osm2gif.png)
 Turns `.osm`, `.osm.pbf`, `.osh.pbf`, and `.csv` files into animated GIFs of mapping activity.  `.csv` files must follow the format:
 
 **`id`, `lon`, `lat`, {[`user`:`timestamp`],[`user`:`timestamp`] ... }**

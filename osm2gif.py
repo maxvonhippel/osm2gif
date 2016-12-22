@@ -69,7 +69,6 @@ def render_video(sigma, video_name, width, height, zoom):
 			# make the map
 			_map = StaticMap(int(float(width)), int(float(height)), url_template='http://a.tile.osm.org/{z}/{x}/{y}.png')
 			if day in days.keys():
-				print("day is in days")
 				# add the nodes
 				for node in days[day]['nodes']:
 					marker = CircleMarker([int(float(node[0])), int(float(node[1]))], '#ff0000', 8)
@@ -84,7 +83,6 @@ def render_video(sigma, video_name, width, height, zoom):
 				# set it to be the "open_image"
 				_map.set_extent(83.676659, 28.220671, 83.804604, 28.409901)
 			# render
-			print("zoom: ", int(float(zoom)))
 			_img = _map.render(zoom=5)
 			# save
 			_name = str(day) + ".png"
