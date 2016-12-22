@@ -2,9 +2,9 @@
 from __future__ import print_function
 import os
 import linecache
-import sys
 import dateutil.parser
-from staticmap import StaticMap, CircleMarker, Polygon
+from staticmap.staticmap.staticmap import StaticMap, CircleMarker, Polygon
+import sys
 import imageio
 import csv
 from StringIO import StringIO
