@@ -85,7 +85,7 @@ def render_video(sigma, video_name, width, height, zoom):
 			# render
 			_img = _map.render(zoom=5)
 			# save
-			_name = str(day) + ".png"
+			_name = "out/" + str(day) + ".png"
 			_img.save(_name)
 			# now add to frames list for video
 			sequence.append(Image.open(_name))
