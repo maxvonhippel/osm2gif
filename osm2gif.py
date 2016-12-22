@@ -32,21 +32,19 @@ def daterange(start_date, end_date):
 
 def add_node(x, y, timestamp):
 	# add the node
-	marker = CircleMarker((x, y), 'white', 8)
 	if not timestamp in days:
 		days[timestamp] = {}
 		days[timestamp]['nodes'] = []
 		days[timestamp]['ways'] = []
-	days[timestamp]['nodes'].append(marker)
+	days[timestamp]['nodes'].append([x,y])
 
 def add_way(members, timestamp):
 	coords = [[member.location.lon, member.location.lat] for member in members]
-	polygon = Polygon(coords, 'white', 'white', True)
 	if not timestamp in days:
 		days[timestamp] = {}
 		days[timestamp]['nodes'] = []
 		days[timestamp]['ways'] = []
-	days[timestamp]['ways'].append(polygon)
+	days[timestamp]['ways'].append(coords)
 
 def render_video(sigma, video_name, width, height, zoom):
 	# iff sigma == True, each frame contains all previous frames' stuff
@@ -67,23 +65,29 @@ def render_video(sigma, video_name, width, height, zoom):
 		eldest = max(alldays)
 		# now iterate
 		for single_date in daterange(youngest, eldest):
+			day = single_date.strftime("%Y-%m-%d")
 			# make the map
 			_map = StaticMap(int(float(width)), int(float(height)), url_template='http://a.tile.osm.org/{z}/{x}/{y}.png')
-			if stamp in days:
+			if day in days.keys():
+				print("day is in days")
 				# add the nodes
-				for node in days[stamp]['nodes']:
-					_map.add_marker(node)
+				for node in days[day]['nodes']:
+					marker = CircleMarker([int(float(node[0])), int(float(node[1]))], '#ff0000', 8)
+					_map.add_marker(marker)
 				# add the ways
-				for way in days[stamp]['ways']:
-					_map.add_polygon(way)
+				for way in days[day]['ways']:
+					poly = Polygon([[int(float(node[0])), int(float(node[1]))] for node in coords], '#ff0000', '#ff0000', True)
+					_map.add_polygon(poly)
 			else:
+				print("empty map")
 				# get the empty image of average location for this list
 				# set it to be the "open_image"
 				_map.set_extent(83.676659, 28.220671, 83.804604, 28.409901)
 			# render
-			_img = _map.render(zoom=int(float(zoom)))
+			print("zoom: ", int(float(zoom)))
+			_img = _map.render(zoom=5)
 			# save
-			_name = stamp + ".png"
+			_name = str(day) + ".png"
 			_img.save(_name)
 			# now add to frames list for video
 			sequence.append(Image.open(_name))
@@ -150,7 +154,7 @@ def read_csv(file, width, height, zoom, video_name, sigma):
 					if len(subrow) == 2:
 						stamp = subrow[1]
 						parsd += 1
-						if parsd % 10000 == 0:
+						if parsd % 100000 == 0:
 							print("num nodes parsed: ", parsd)
 						add_node(lon, lat, stamp)
 		csvfile.close()
