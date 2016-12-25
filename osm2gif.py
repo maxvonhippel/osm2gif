@@ -64,8 +64,11 @@ def render_video(sigma, video_name, width, height, zoom):
 		youngest = min(alldays)
 		eldest = max(alldays)
 		# now iterate
+		print("keys: ", days.keys())
+		empty_name = ""
 		for single_date in daterange(youngest, eldest):
 			day = single_date.strftime("%Y-%m-%d")
+			print("day: ", day)
 			# make the map
 			_map = StaticMap(int(float(width)), int(float(height)), url_template='http://a.tile.osm.org/{z}/{x}/{y}.png')
 			if day in days.keys():
@@ -77,19 +80,30 @@ def render_video(sigma, video_name, width, height, zoom):
 				for way in days[day]['ways']:
 					poly = Polygon([[int(float(node[0])), int(float(node[1]))] for node in coords], '#ff0000', '#ff0000', True)
 					_map.add_polygon(poly)
+				# render
+				_img = _map.render(zoom=5)
+				# save
+				_name = str(day) + ".png"
+				_img.save(_name)
+				# now add to frames list for video
+				img_tmp = Image.open(_name)
+				sequence.append(img_tmp.copy())
+				img_tmp.close()
 			else:
 				print("empty map")
 				# get the empty image of average location for this list
 				# set it to be the "open_image"
-				_map.set_extent(83.676659, 28.220671, 83.804604, 28.409901)
-			# render
-			_img = _map.render(zoom=5)
-			# save
-			_name = "out/" + str(day) + ".png"
-			_img.save(_name)
-			# now add to frames list for video
-			sequence.append(Image.open(_name))
-
+				if empty_name == "":
+					_map.set_extent(83.676659, 28.220671, 83.804604, 28.409901)
+					# render
+					_img = _map.render(zoom=5)
+					# save
+					empty_name = str(day) + ".png"
+					_img.save(empty_name)
+				# now add to frames list for video
+				img_tmp = Image.open(empty_name)
+				sequence.append(img_tmp.copy())
+				img_tmp.close()
 		# https://github.com/python-pillow/Pillow/blob/master/Scripts/gifmaker.py
 		frames = [frame.copy() for frame in ImageSequence.Iterator(sequence)]
 		fp = open(video_name, "wb")
@@ -152,7 +166,7 @@ def read_csv(file, width, height, zoom, video_name, sigma):
 					if len(subrow) == 2:
 						stamp = subrow[1]
 						parsd += 1
-						if parsd % 100000 == 0:
+						if parsd % 1000000 == 0:
 							print("num nodes parsed: ", parsd)
 						add_node(lon, lat, stamp)
 		csvfile.close()
