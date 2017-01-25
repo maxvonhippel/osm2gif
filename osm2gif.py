@@ -46,13 +46,44 @@ def add_way(members, timestamp):
 		days[timestamp]['ways'] = []
 	days[timestamp]['ways'].append(coords)
 
-def render_video(sigma, video_name, width, height, zoom):
+def append_day_to_map(_map, day):
+	if day in days.keys():
+		# add the nodes
+		for node in days[day]['nodes']:
+			marker = CircleMarker([int(float(node[0])), int(float(node[1]))], '#ff0000', 4)
+			_map.add_marker(marker)
+		# add the ways
+		for way in days[day]['ways']:
+			poly = Polygon([[int(float(node[0])), int(float(node[1]))] for node in coords], '#ff0000', '#ff0000', True)
+			_map.add_polygon(poly)
+	else:
+		print("empty map")
+		# get the empty image of average location for this list
+		# set it to be the "open_image"
+
+def render_day(single_date, width, height, zoom, cumulative, youngest):
+	day = single_date.strftime("%Y-%m-%d")
+	print("day: ", day)
+	# make the map
+	_map = StaticMap(int(float(width)), int(float(height)), url_template='http://a.tile.osm.org/{z}/{x}/{y}.png')
+	_map.set_extent(83.676659, 28.220671, 83.804604, 28.409901)
+	append_day_to_map(_map, single_date)
+	# if cumulative, add all prior stuff to the map
+	if cumulative == True:
+		for prior_date in daterange(youngest, single_date):
+			append_day_to_map(_map, prior_date)
+	# render
+	_img = _map.render(zoom=zoom)
+	# save
+	_name = str(day) + ".png"
+	_img.save(_name)
+
+
+def render_video(width, height, zoom, cumulative):
 	# iff sigma == True, each frame contains all previous frames' stuff
 	# otherwise only stuff from that specific day
 	try:
 		# http://stackoverflow.com/a/35943809/1586231
-		if not video_name.endswith('.gif'):
-			video_name += '.gif'
 		sequence = []
 		# what is the earliest and last day in the list?
 		alldays = []
@@ -67,61 +98,14 @@ def render_video(sigma, video_name, width, height, zoom):
 		print("keys: ", days.keys())
 		empty_name = ""
 		for single_date in daterange(youngest, eldest):
-			day = single_date.strftime("%Y-%m-%d")
-			print("day: ", day)
-			# make the map
-			_map = StaticMap(int(float(width)), int(float(height)), url_template='http://a.tile.osm.org/{z}/{x}/{y}.png')
-			if day in days.keys():
-				# add the nodes
-				for node in days[day]['nodes']:
-					marker = CircleMarker([int(float(node[0])), int(float(node[1]))], '#ff0000', 8)
-					_map.add_marker(marker)
-				# add the ways
-				for way in days[day]['ways']:
-					poly = Polygon([[int(float(node[0])), int(float(node[1]))] for node in coords], '#ff0000', '#ff0000', True)
-					_map.add_polygon(poly)
-				# render
-				_img = _map.render(zoom=5)
-				# save
-				_name = str(day) + ".png"
-				_img.save(_name)
-				# now add to frames list for video
-				img_tmp = Image.open(_name)
-				sequence.append(img_tmp.copy())
-				img_tmp.close()
-			else:
-				print("empty map")
-				# get the empty image of average location for this list
-				# set it to be the "open_image"
-				if empty_name == "":
-					_map.set_extent(83.676659, 28.220671, 83.804604, 28.409901)
-					# render
-					_img = _map.render(zoom=5)
-					# save
-					empty_name = str(day) + ".png"
-					_img.save(empty_name)
-				# now add to frames list for video
-				img_tmp = Image.open(empty_name)
-				sequence.append(img_tmp.copy())
-				img_tmp.close()
-		# https://github.com/python-pillow/Pillow/blob/master/Scripts/gifmaker.py
-		frames = [frame.copy() for frame in ImageSequence.Iterator(sequence)]
-		fp = open(video_name, "wb")
-		im = Image.open(fp)
-		im.save(frames, save_all=True)
-		fp.close()
+			render_day(single_date, width, height, zoom, cumulative, youngest)
 		print("all done!")
-		clean_up_frames(sequence)
 	
 	except:
 		PrintException()
 
-def clean_up_frames(frames):
-	for frame in frames:
-		os.remove(frame)
-
 # for OSM (.osm, .osh, .pbf) files
-def read_osm(file, width, height, zoom, video_name, sigma):
+def read_osm(file, width, height, zoom, cumulative):
 	try:
 		# imports
 		import osmium
@@ -145,13 +129,13 @@ def read_osm(file, width, height, zoom, video_name, sigma):
 		map_handler.apply_file(file)
 
 		# render video
-		render_video(sigma, video_name, width, height, zoom)
+		render_video(sigma, width, height, zoom, cumulative)
 	except:
 		PrintException()
 
 # for .csv files
 # format: id,longitude,latitude,"{[Name:timestamp], ... }"
-def read_csv(file, width, height, zoom, video_name, sigma):
+def read_csv(file, width, height, zoom, cumulative):
 	parsd = 0
 	mapd = 0
 	try:
@@ -170,9 +154,9 @@ def read_csv(file, width, height, zoom, video_name, sigma):
 							print("num nodes parsed: ", parsd)
 						add_node(lon, lat, stamp)
 		csvfile.close()
-		render_video(sigma, video_name, width, height, zoom)
+		render_video(width, height, zoom, cumulative)
 	except:
 		PrintException()
 
 # test
-read_csv('/Users/maxvonhippel/Documents/OSMHistoryServer/nodes.csv', 500, 500, 5, "nepal-osm-vid", False)
+read_csv('/Users/maxvonhippel/Documents/OSMHistoryServer/nodes.csv', 500, 500, 5, True)
